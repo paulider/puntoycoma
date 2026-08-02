@@ -1,0 +1,32 @@
+<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#6b1730"><title>Punto y Coma · T-007</title><style>:root{--b:#6b1730;--p:#faf8f3;--i:#282125;--m:#776d71;--l:#ded6d1;--ok:#2f6f4e;--bad:#a22c3d}*{box-sizing:border-box}body{margin:0;background:var(--p);color:var(--i);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.top{background:var(--b);color:#fff;padding:calc(18px + env(safe-area-inset-top)) 20px 22px}.brand{font:500 18px Georgia,serif;letter-spacing:.12em}.brand small{display:block;font:10px sans-serif;letter-spacing:.18em;opacity:.7;margin-top:7px}.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.badge{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);font-size:11px;font-weight:700}.wrap{max-width:760px;margin:auto;padding:18px}.panel{background:#fff;border:1px solid var(--l);border-radius:16px;overflow:hidden;margin-bottom:14px;box-shadow:0 8px 24px rgba(60,30,40,.04)}.head{padding:15px 16px;border-bottom:1px solid var(--l)}.head h2{margin:0;font:500 20px Georgia,serif}.body{padding:16px}.status{padding:13px;border-radius:12px;background:#f2ece7;font-size:14px;line-height:1.5}.status.ok{background:#e4f2ea;color:var(--ok)}.status.bad{background:#f8e7ea;color:var(--bad)}.row{padding:12px 0;border-bottom:1px solid #eee7e2}.row:last-child{border-bottom:0}.row span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--m)}.row strong{display:block;margin-top:4px}.row small{display:block;color:var(--m);margin-top:4px}.btn{width:100%;margin-top:12px;border:1px solid var(--b);background:var(--b);color:#fff;border-radius:12px;padding:12px 14px;font-weight:700}</style></head><body><header class="top"><div class="brand">PUNTO Y COMA<small>FULL FLOW TEST</small></div><div class="badges"><span class="badge">v0.2.1-dev.7</span><span class="badge">T-007</span><span class="badge">Schema v2</span><span class="badge">Cases E2E</span></div></header><main class="wrap"><section class="panel"><div class="head"><h2>Prova completa d’expedients</h2></div><div class="body"><div id="status" class="status">Executant el flux complet...</div><button class="btn" onclick="runFullFlow()">Tornar a executar T-007</button></div></section><section class="panel"><div class="head"><h2>Resultats</h2></div><div id="results" class="body"></div></section></main><script>
+const VERSION='v0.2.1-dev.7',SUITE='T-007',KEY='pyc_office_v2';
+const empty=()=>({version:2,settings:{},clients:[],cases:[],documents:[],activity:[]});
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||empty()}catch{return empty()}};
+const save=s=>localStorage.setItem(KEY,JSON.stringify(s));
+const findCase=(s,id)=>s.cases.find(c=>c.id===id)||null;
+const searchCases=(s,q)=>{q=String(q).toLowerCase();return s.cases.filter(c=>{const people=(c.participants||[]).map(p=>s.clients.find(x=>x.id===p.clientId)?.name||'').join(' ');return [c.name,c.code,c.type,c.status,people].join(' ').toLowerCase().includes(q)})};
+const clientCases=(s,clientId)=>s.cases.filter(c=>(c.participants||[]).some(p=>p.clientId===clientId));
+const result=(name,ok,detail='')=>({name,ok,detail});
+function render(items){document.getElementById('results').innerHTML=items.map(t=>`<div class="row"><span>${t.ok?'Correcte':'Error'}</span><strong>${t.name}</strong>${t.detail?`<small>${t.detail}</small>`:''}</div>`).join('');const failed=items.filter(t=>!t.ok).length;const s=document.getElementById('status');s.textContent=failed?`${VERSION} · ${SUITE}: ${failed} proves han fallat.`:`${VERSION} · ${SUITE}: flux complet superat i dades restaurades.`;s.className='status '+(failed?'bad':'ok')}
+function runFullFlow(){const original=localStorage.getItem(KEY);const tests=[];try{
+ tests.push(result('Capçalera i build correctes',VERSION==='v0.2.1-dev.7'&&SUITE==='T-007'));
+ const state=load();const ids=['t007-c1','t007-c2','t007-c3'];state.clients=state.clients.filter(c=>!ids.includes(c.id));state.cases=state.cases.filter(c=>c.id!=='t007-e1');state.clients.push({id:ids[0],name:'Anna Test'},{id:ids[1],name:'Marc Test'},{id:ids[2],name:'Laia Test'});save(state);
+ let current=load();tests.push(result('Crear tres clients temporals',ids.every(id=>current.clients.some(c=>c.id===id))));
+ current.cases.push({id:'t007-e1',name:'Divorci Test',code:'EXP-T007-001',type:'divorci',status:'obert',participants:[{clientId:ids[0],role:'conyuge_1',isPrimary:true},{clientId:ids[1],role:'conyuge_2',isPrimary:false}]});save(current);
+ current=load();tests.push(result('Crear expedient',Boolean(findCase(current,'t007-e1'))));
+ tests.push(result('Afegir dos participants',findCase(current,'t007-e1')?.participants.length===2));
+ tests.push(result('Validar relacions inicials',clientCases(current,ids[0]).some(c=>c.id==='t007-e1')&&clientCases(current,ids[1]).some(c=>c.id==='t007-e1')));
+ const target=findCase(current,'t007-e1');target.participants.push({clientId:ids[2],role:'representant',isPrimary:false});target.status='en espera';save(current);
+ current=load();tests.push(result('Afegir tercer participant',findCase(current,'t007-e1')?.participants.length===3));
+ const edited=findCase(current,'t007-e1');edited.participants[2].role='hereva';edited.name='Expedient familiar Test';save(current);
+ current=load();tests.push(result('Editar rols i nom',findCase(current,'t007-e1')?.participants[2].role==='hereva'&&findCase(current,'t007-e1')?.name==='Expedient familiar Test'));
+ tests.push(result('Buscar expedient pel nom',searchCases(current,'expedient familiar test').some(c=>c.id==='t007-e1')));
+ tests.push(result('Buscar expedient per participant',searchCases(current,'laia test').some(c=>c.id==='t007-e1')));
+ tests.push(result('Cada client veu l’expedient',ids.every(id=>clientCases(current,id).some(c=>c.id==='t007-e1'))));
+ current.cases=current.cases.filter(c=>c.id!=='t007-e1');save(current);
+ current=load();tests.push(result('Eliminar expedient',!findCase(current,'t007-e1')));
+ tests.push(result('Desapareix de les relacions',ids.every(id=>clientCases(current,id).every(c=>c.id!=='t007-e1'))));
+ }catch(error){tests.push(result('Execució de la suite',false,error.message))}finally{if(original===null)localStorage.removeItem(KEY);else localStorage.setItem(KEY,original)}
+ tests.push(result('Restaurar dades prèvies',localStorage.getItem(KEY)===original));render(tests)}
+runFullFlow();
+</script></body></html>
