@@ -1,0 +1,53 @@
+name: Apply standalone A4 print fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-print-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch standalone print function
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          old = "function printInvoice(){const page=document.querySelector('.invoice-page');if(page){page.style.transform='none';page.style.marginBottom='0'}setTimeout(()=>window.print(),50)}"
+          new = r'''function printInvoice(){
+            const source=document.querySelector('.invoice-page');
+            if(!source)return;
+            const page=source.cloneNode(true);
+            page.removeAttribute('style');
+            page.style.transform='none';
+            page.style.margin='0';
+            page.style.boxShadow='none';
+            const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+            const popup=window.open('','_blank');
+            if(!popup){alert('Safari ha bloqueado la ventana de impresión. Permite las ventanas emergentes y vuelve a intentarlo.');return;}
+            popup.document.open();
+            popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(draft.number||'Factura')}</title><style>${css}\n@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;width:210mm!important;background:#fff!important}.invoice-page{display:block!important;transform:none!important;box-shadow:none!important;margin:0!important;width:210mm!important;min-height:297mm!important;height:auto!important;padding:18mm 18mm 14mm!important}.app,.modal,.sheet-head,.sheet-actions{display:none!important}</style></head><body>${page.outerHTML}<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},250)});<\/script></body></html>`);
+            popup.document.close();
+          }'''
+          if old not in text:
+              raise SystemExit('Target print function not found')
+          p.write_text(text.replace(old,new),encoding='utf-8')
+          PY
+      - name: Commit and publish
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Separate invoice preview from full-size A4 printing"
+          git push origin main
+          git push origin main:gh-pages --force
