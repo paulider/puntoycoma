@@ -1,0 +1,38 @@
+name: Enable multi-client cases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/enable-multi-client.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Include multi-client module
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          tag = '<script src="multi-client.js"></script>'
+          if tag not in text:
+              text = text.replace('</body>', tag + '</body>')
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit and publish
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Enable multiple clients per case"
+          git push origin main
+          git push origin main:gh-pages --force
