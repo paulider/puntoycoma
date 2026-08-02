@@ -1,0 +1,60 @@
+name: Add backup system v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-backups-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add backup controls and logic
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          text=p.read_text(encoding='utf-8')
+
+          text=text.replace(
+            '.empty{text-align:center;padding:30px;color:var(--muted)}',
+            '.empty{text-align:center;padding:30px;color:var(--muted)}.backup-status{margin-top:10px;padding:12px;border-radius:12px;background:#f6f2ee;font-size:12px;line-height:1.5}.backup-status.ok{background:#e7f3eb;color:#2f6f4e}.backup-status.warn{background:#f7ebdf;color:#8a5f23}.backup-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.backup-actions .btn{width:100%}'
+          )
+
+          old_settings='<div class="field"><label>IBAN</label><input id="sIban"></div><button class="btn primary" style="width:100%" onclick="saveSettings()">Guardar</button>'
+          new_settings='''<div class="field"><label>IBAN</label><input id="sIban"></div><button class="btn primary" style="width:100%" onclick="saveSettings()">Guardar</button><div class="panel" style="margin-top:18px"><div class="panel-head"><h2>Copias de seguridad</h2></div><div class="sheet-body"><div class="field"><label><input id="autoBackupEnabled" type="checkbox" onchange="setAutoBackup(this.checked)" style="width:auto;margin-right:8px">Copia automática diaria al abrir</label></div><div id="backupStatus" class="backup-status warn">No se ha configurado una carpeta de copias.</div><div class="backup-actions"><button class="btn" onclick="chooseBackupFolder()">Elegir carpeta</button><button class="btn" onclick="createBackupNow()">Crear copia ahora</button><button class="btn" onclick="exportBackup()">Exportar JSON</button><button class="btn" onclick="document.getElementById(\'backupImport\').click()">Importar copia</button></div><input id="backupImport" type="file" accept="application/json" hidden onchange="importBackup(event)"></div></div>'''
+          if old_settings not in text:
+            raise SystemExit('Settings target not found')
+          text=text.replace(old_settings,new_settings,1)
+
+          old_state="const KEY='pyc_office_v01';let state=JSON.parse(localStorage.getItem(KEY)||'null')||"
+          new_state="const KEY='pyc_office_v01',BACKUP_META_KEY='pyc_backup_meta_v01';let backupDirHandle=null;let state=JSON.parse(localStorage.getItem(KEY)||'null')||"
+          if old_state not in text:
+            raise SystemExit('State target not found')
+          text=text.replace(old_state,new_state,1)
+
+          marker="function persist(){localStorage.setItem(KEY,JSON.stringify(state));render()}"
+          addition=r'''function persist(){localStorage.setItem(KEY,JSON.stringify(state));render()}function backupPayload(){return{app:'Punto y Coma Office',version:1,exportedAt:new Date().toISOString(),data:state}}function backupFilename(){const d=new Date(),pad=n=>String(n).padStart(2,'0');return`PYC_Backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`}function downloadJson(payload,name){const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}function exportBackup(){downloadJson(backupPayload(),backupFilename());setBackupMeta({lastBackup:new Date().toISOString(),mode:'download'});updateBackupUI()}function setBackupMeta(patch){const meta={...JSON.parse(localStorage.getItem(BACKUP_META_KEY)||'{}'),...patch};localStorage.setItem(BACKUP_META_KEY,JSON.stringify(meta));return meta}function getBackupMeta(){return JSON.parse(localStorage.getItem(BACKUP_META_KEY)||'{}')}function setAutoBackup(enabled){setBackupMeta({enabled});updateBackupUI()}async function chooseBackupFolder(){if(!window.showDirectoryPicker){alert('La selección automática de carpeta requiere Chrome o Edge en PC/Mac. Puedes usar Exportar JSON en otros navegadores.');return}try{backupDirHandle=await window.showDirectoryPicker({mode:'readwrite'});setBackupMeta({folderName:backupDirHandle.name,enabled:true});await createBackupNow();}catch(e){if(e.name!=='AbortError')alert('No se pudo acceder a la carpeta: '+e.message)}updateBackupUI()}async function createBackupNow(){const payload=backupPayload(),name=backupFilename();if(backupDirHandle){try{const permission=await backupDirHandle.requestPermission({mode:'readwrite'});if(permission!=='granted')throw new Error('Permiso no concedido');const file=await backupDirHandle.getFileHandle(name,{create:true}),writer=await file.createWritable();await writer.write(JSON.stringify(payload,null,2));await writer.close();setBackupMeta({lastBackup:new Date().toISOString(),lastDate:new Date().toISOString().slice(0,10),folderName:backupDirHandle.name,enabled:true,mode:'folder'});updateBackupUI();return}catch(e){alert('No se pudo guardar en la carpeta seleccionada. Se descargará una copia manual.')}}downloadJson(payload,name);setBackupMeta({lastBackup:new Date().toISOString(),lastDate:new Date().toISOString().slice(0,10),mode:'download'});updateBackupUI()}async function maybeDailyBackup(){const meta=getBackupMeta();if(!meta.enabled)return;const todayKey=new Date().toISOString().slice(0,10);if(meta.lastDate===todayKey)return;if(backupDirHandle)await createBackupNow();else updateBackupUI()}function importBackup(event){const file=event.target.files&&event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const parsed=JSON.parse(reader.result),data=parsed.data||parsed;if(!data||!Array.isArray(data.clients)||!Array.isArray(data.cases)||!Array.isArray(data.documents))throw new Error('Formato no válido');if(!confirm('Esta acción sustituirá los datos actuales. ¿Continuar?'))return;state=data;localStorage.setItem(KEY,JSON.stringify(state));log('Copia de seguridad restaurada',file.name);persist();alert('Copia restaurada correctamente.')}catch(e){alert('No se pudo importar la copia: '+e.message)}finally{event.target.value=''}};reader.readAsText(file)}function updateBackupUI(){const box=document.getElementById('backupStatus'),check=document.getElementById('autoBackupEnabled');if(!box||!check)return;const meta=getBackupMeta();check.checked=!!meta.enabled;let text=meta.folderName?`Carpeta: ${meta.folderName}. `:'Carpeta no vinculada en esta sesión. ';text+=meta.lastBackup?`Última copia: ${new Date(meta.lastBackup).toLocaleString('es-ES')}.`:'Todavía no hay copias.';box.textContent=text;box.className='backup-status '+(meta.lastBackup?'ok':'warn')}'''
+          if marker not in text:
+            raise SystemExit('Persist target not found')
+          text=text.replace(marker,addition,1)
+
+          text=text.replace('render();\n</script>',"render();updateBackupUI();maybeDailyBackup();\n</script>")
+          p.write_text(text,encoding='utf-8')
+          PY
+      - name: Commit and publish
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Add backup export, import and daily folder workflow"
+          git push origin main
+          git push origin main:gh-pages --force
