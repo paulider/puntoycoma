@@ -14,6 +14,7 @@
   function issuerData(settings = {}) {
     return {
       name: settings.name || settings.legalName || settings.fiscalName || 'Julia María Rico López',
+      signatureName: settings.signatureName || 'Julia Rico',
       tax: settings.tax || settings.nif || settings.vatNumber || '74011732D',
       address: settings.address || settings.fiscalAddress || 'c/ Camí Can Dori 32, 08811 Canyelles, Barcelona',
       email: settings.email || settings.billingEmail || 'julia@pyc.legal',
@@ -49,7 +50,7 @@
       :root{--gold:#bfa16b;--ink:#191719;--line:#ddd7cf;--soft:#f4f0ea}
       body{margin:0;background:#eceae7;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
       .toolbar{position:sticky;top:0;z-index:5;background:#6b1730;padding:12px;text-align:center}
-      .toolbar button{font:600 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:10px 14px;border:0;border-radius:9px;margin:0 4px}
+      .toolbar button{font:600 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:10px 14px;border:0;border-radius:9px;margin:0 4px;min-height:44px;cursor:pointer}
       .page{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:19mm 16mm 14mm;display:flex;flex-direction:column}
       .top{display:grid;grid-template-columns:1fr 1fr;gap:20mm;align-items:start}
       .brand{font-family:Georgia,"Times New Roman",serif;font-size:22px;letter-spacing:.13em;line-height:1.1}
@@ -84,7 +85,7 @@
       .website{text-align:center;color:var(--gold);letter-spacing:.26em;font-size:8px;margin-top:8mm;text-transform:uppercase}
       @media print{body{background:#fff}.toolbar{display:none}.page{margin:0}}
     </style></head><body>
-      <div class="toolbar"><button onclick="print()">Guardar / imprimir PDF</button><button onclick="close()">Cerrar</button></div>
+      <div class="toolbar"><button id="savePdfBtn" type="button">Guardar / imprimir PDF</button><button id="closePdfBtn" type="button">Cerrar</button></div>
       <article class="page">
         <section class="top">
           <div><div class="brand">PUNTO Y COMA <span class="mark">;</span></div><div class="brand-sub">Legal</div></div>
@@ -97,10 +98,22 @@
         </section>
         <table><thead><tr><th>Concepto</th><th>Descripción</th><th class="num">Cant.</th><th class="num">Precio unit.</th><th class="num">Importe</th></tr></thead><tbody>${rows}</tbody></table>
         <section class="totals"><div><span>Base imponible</span><strong>${money(base)}</strong></div><div><span>IVA</span><strong>${money(vat)}</strong></div><div class="grand"><span>Total</span><strong>${money(total)}</strong></div></section>
-        <div class="note"><b>Nota</b>Gracias por confiar en nuestros servicios. Quedamos a su disposición para cualquier consulta.</div>
-        <footer class="footer"><div class="footer-mark">;</div><div class="footer-copy"><b>PUNTO Y COMA LEGAL</b>${esc(issuer.email)}<br>${esc(issuer.phone)}</div><div class="footer-sign"><strong>${esc(issuer.name)}</strong><span>Abogada</span></div></footer>
+        <div class="note"><b>Nota</b>Agradecemos la confianza en nuestros servicios. Quedamos a su disposición para cualquier consulta.</div>
+        <footer class="footer"><div class="footer-mark">;</div><div class="footer-copy"><b>PUNTO Y COMA LEGAL</b>${esc(issuer.email)}<br>${esc(issuer.phone)}</div><div class="footer-sign"><strong>${esc(issuer.signatureName)}</strong><span>Abogada</span></div></footer>
         <div class="website">${esc(issuer.website)}</div>
       </article>
+      <script>
+        (()=>{
+          const saveButton=document.getElementById('savePdfBtn');
+          const closeButton=document.getElementById('closePdfBtn');
+          saveButton.addEventListener('click',()=>window.print());
+          closeButton.addEventListener('click',()=>{
+            if(window.opener){window.close();return;}
+            if(history.length>1){history.back();return;}
+            window.location.href='about:blank';
+          });
+        })();
+      <\/script>
     </body></html>`;
   }
 
