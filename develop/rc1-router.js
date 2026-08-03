@@ -2,7 +2,7 @@
   'use strict';
   const STATE_KEY='pyc_office_v2';
   const DRAFT_KEY='pyc_invoice_advanced_i18n_draft_v1';
-  const ADVANCED_URL='invoice-rc1.html?build=rc1-1';
+  const ADVANCED_URL='invoice-rc1-stable.html?build=rc1-3';
 
   function loadState(){
     try{return JSON.parse(localStorage.getItem(STATE_KEY)||'null')||{documents:[],cases:[]};}
