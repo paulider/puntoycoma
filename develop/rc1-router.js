@@ -2,7 +2,7 @@
   'use strict';
   const STATE_KEY='pyc_office_v2';
   const DRAFT_KEY='pyc_invoice_advanced_i18n_draft_v1';
-  const ADVANCED_URL='invoice-advanced-i18n-v041.html?rc=1';
+  const ADVANCED_URL='invoice-rc1.html?build=rc1-1';
 
   function loadState(){
     try{return JSON.parse(localStorage.getItem(STATE_KEY)||'null')||{documents:[],cases:[]};}
@@ -18,7 +18,7 @@
       {id:'group-discounts',key:'discounts',kind:'builtin',order:3}
     ];
     const lines=(invoice?.lines||[]).map(line=>({
-      id:line.id,
+      id:line.id||crypto.randomUUID?.()||String(Date.now()),
       sourceType:line.sourceType||'manual',
       sourceId:line.sourceId||null,
       concept:line.concept||'',
